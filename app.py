@@ -209,18 +209,17 @@ if 'current_tab' not in st.session_state:
     st.session_state.current_tab = 'Dashboard'
 
 # Load data on startup
-if st.session_state.get('first_run', True):
+if 'first_run' not in st.session_state:
     loaded_data = fetch_from_github()
     if loaded_data:
         st.session_state.data = loaded_data
-    st.session_state.first_run = False
+    st.session_state.first_run = True
 
 # ============================================================
 # SIDEBAR
 # ============================================================
 
 with st.sidebar:
-    st.image("https://img.icons8.com/color/96/000000/ethiopia.png", width=80)
     st.title("🎯 TrackMaster")
     st.markdown("---")
     
@@ -370,7 +369,7 @@ if st.session_state.current_tab == "📊 Dashboard":
         df = pd.DataFrame(all_items)
         df = df.sort_values('created', ascending=False).head(10)
         
-        for _, row in df.iterrows():
+        for idx, row in df.iterrows():
             days = get_days_left(row['deadline'])
             status_info = get_status_info(days, row['status'])
             
@@ -385,7 +384,7 @@ if st.session_state.current_tab == "📊 Dashboard":
                 st.caption(status_info['label'])
             with col4:
                 if row['status'] == 'active':
-                    if st.button(f"📤 Submit", key=f"dash_submit_{row['name']}_{row['created']}"):
+                    if st.button(f"📤 Submit", key=f"dash_submit_{idx}"):
                         # Find and update the item
                         if row['type'] == '🎓 Scholarship':
                             for s in st.session_state.data['scholarships']:
@@ -400,9 +399,10 @@ if st.session_state.current_tab == "📊 Dashboard":
                         if save_to_github(st.session_state.data):
                             st.success("✅ Submitted!")
                             st.rerun()
-        st.markdown("---")
     else:
         st.info("No items yet. Start adding scholarships and jobs!")
+    
+    st.markdown("---")
 
 # ============================================================
 # SCHOLARSHIPS TAB
@@ -499,22 +499,22 @@ elif st.session_state.current_tab == "🎓 Scholarships":
                 
                 with col4:
                     if s.get('status') == 'active':
-                        if st.button(f"📤 Submit", key=f"s_submit_{idx}_{s.get('id')}"):
+                        if st.button(f"📤 Submit", key=f"s_submit_{idx}"):
                             s['status'] = 'submitted'
                             if save_to_github(st.session_state.data):
                                 st.success("✅ Marked as submitted!")
                                 st.rerun()
                     if s.get('status') == 'submitted':
-                        if st.button(f"↩️ Undo", key=f"s_undo_{idx}_{s.get('id')}"):
+                        if st.button(f"↩️ Undo", key=f"s_undo_{idx}"):
                             s['status'] = 'active'
                             if save_to_github(st.session_state.data):
                                 st.success("↩️ Undone!")
                                 st.rerun()
-                    if st.button(f"🗑️ Delete", key=f"s_del_{idx}_{s.get('id')}"):
-                        if st.session_state.data['scholarships'].remove(s):
-                            if save_to_github(st.session_state.data):
-                                st.success("🗑️ Deleted!")
-                                st.rerun()
+                    if st.button(f"🗑️ Delete", key=f"s_del_{idx}"):
+                        st.session_state.data['scholarships'].remove(s)
+                        if save_to_github(st.session_state.data):
+                            st.success("🗑️ Deleted!")
+                            st.rerun()
                 
                 st.markdown("---")
     else:
@@ -615,22 +615,22 @@ elif st.session_state.current_tab == "💼 Jobs":
                 
                 with col4:
                     if j.get('status') == 'active':
-                        if st.button(f"📤 Submit", key=f"j_submit_{idx}_{j.get('id')}"):
+                        if st.button(f"📤 Submit", key=f"j_submit_{idx}"):
                             j['status'] = 'submitted'
                             if save_to_github(st.session_state.data):
                                 st.success("✅ Marked as submitted!")
                                 st.rerun()
                     if j.get('status') == 'submitted':
-                        if st.button(f"↩️ Undo", key=f"j_undo_{idx}_{j.get('id')}"):
+                        if st.button(f"↩️ Undo", key=f"j_undo_{idx}"):
                             j['status'] = 'active'
                             if save_to_github(st.session_state.data):
                                 st.success("↩️ Undone!")
                                 st.rerun()
-                    if st.button(f"🗑️ Delete", key=f"j_del_{idx}_{j.get('id')}"):
-                        if st.session_state.data['jobs'].remove(j):
-                            if save_to_github(st.session_state.data):
-                                st.success("🗑️ Deleted!")
-                                st.rerun()
+                    if st.button(f"🗑️ Delete", key=f"j_del_{idx}"):
+                        st.session_state.data['jobs'].remove(j)
+                        if save_to_github(st.session_state.data):
+                            st.success("🗑️ Deleted!")
+                            st.rerun()
                 
                 st.markdown("---")
     else:
@@ -760,7 +760,10 @@ elif st.session_state.current_tab == "📈 Progress":
         with col1:
             st.markdown("### 🎓 Scholarships")
             if st.session_state.data['scholarships']:
-                s_status = pd.DataFrame(st.session_state.data['scholarships'])['status'].value_counts()
+                s_status = {}
+                for s in st.session_state.data['scholarships']:
+                    status = s.get('status', 'unknown')
+                    s_status[status] = s_status.get(status, 0) + 1
                 for status, count in s_status.items():
                     st.write(f"- {status}: {count}")
             else:
@@ -769,7 +772,10 @@ elif st.session_state.current_tab == "📈 Progress":
         with col2:
             st.markdown("### 💼 Jobs")
             if st.session_state.data['jobs']:
-                j_status = pd.DataFrame(st.session_state.data['jobs'])['status'].value_counts()
+                j_status = {}
+                for j in st.session_state.data['jobs']:
+                    status = j.get('status', 'unknown')
+                    j_status[status] = j_status.get(status, 0) + 1
                 for status, count in j_status.items():
                     st.write(f"- {status}: {count}")
             else:
